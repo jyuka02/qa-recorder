@@ -245,29 +245,72 @@ function renderFindings(){
 }
 
 function buildReport(){
-  var txt='QA FINDINGS REPORT\nGenerated: '+new Date().toLocaleString()+'\n\n';
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8">';
+  html+='<style>';
+  html+='body{background:#1a1a2e;color:#ccc;font-family:Arial,sans-serif;padding:32px;max-width:700px;margin:0 auto;font-size:14px;line-height:1.7}';
+  html+='h3{color:#fff;font-size:15px;margin-bottom:12px}';
+  html+='.section{margin-bottom:28px;padding-bottom:28px;border-bottom:1px solid #333}';
+  html+='.label{color:#fff;font-weight:bold;display:inline}';
+  html+='.italic{font-style:italic}';
+  html+='ul{margin:4px 0 8px 20px;padding:0}';
+  html+='li{margin-bottom:4px}';
+  html+='</style></head><body>';
+
   findings.forEach(function(f){
-    txt+='Finding #'+f.id+' — '+f.severity.toUpperCase()+'\n';
-    txt+='Module: '+f.module+'\n';
-    txt+='Issue: '+f.issue+'\n';
-    if(f.expected)txt+='Expected: '+f.expected+'\n';
-    if(f.steps.length)txt+='Steps to Recreate:\n'+f.steps.join('\n')+'\n';
-    txt+='\n---\n\n';
+    html+='<div class="section">';
+
+    // Module
+    html+='<h3>Module: '+f.module+'</h3>';
+
+    // Steps to recreate — use captured events
+    html+='<p><span class="label">Steps to recreate:</span></p><ul>';
+    if(f.steps && f.steps.length>0){
+      f.steps.forEach(function(s){
+        // strip the leading "1. [click] " prefix for cleaner bullet text
+        var clean=s.replace(/^\d+\.\s*\[.*?\]\s*/,'');
+        html+='<li>'+clean+'</li>';
+      });
+    } else {
+      html+='<li>No steps captured — start recording before logging findings</li>';
+    }
+    html+='</ul>';
+
+    // Issue
+    html+='<p><span class="label">Issue:</span> '+f.issue+'</p>';
+
+    // Expected
+    if(f.expected){
+      // Bold "Expected:" then the rest with italic for the key parts
+      var exp=f.expected;
+      html+='<p><span class="label">Expected:</span> '+exp+'</p>';
+    }
+
+    html+='</div>';
   });
-  return txt;
+
+  html+='</body></html>';
+  return html;
 }
 
 function exportAll(){
   if(findings.length===0){alert('No findings to export yet.');return;}
+
   // 1. Download video
   if(chunks.length>0){
     var blob=new Blob(chunks,{type:'video/webm'});
-    var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='qa-recording.webm';a.click();
+    var a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='qa-recording.webm';
+    a.click();
   }
-  // 2. Download text report
+
+  // 2. Download HTML report (matches the dark format)
+  var html=buildReport();
   var a2=document.createElement('a');
-  a2.href='data:text/plain;charset=utf-8,'+encodeURIComponent(buildReport());
-  a2.download='qa-findings.txt';a2.click();
+  a2.href='data:text/html;charset=utf-8,'+encodeURIComponent(html);
+  a2.download='qa-findings-report.html';
+  a2.click();
+
   // 3. Send to Google Sheets
   fetch(APPS_SCRIPT_URL,{
     method:'POST',
