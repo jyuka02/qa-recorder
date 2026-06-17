@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QA Findings Recorder</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;background:#f5f5f5;padding:16px;min-height:100vh}
+.topbar{display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #e0e0e0;border-radius:10px;padding:12px 16px;margin-bottom:12px;flex-wrap:wrap;gap:8px}
+.logo{font-weight:600;font-size:15px;color:#333;display:flex;align-items:center;gap:8px}
+.badge{background:#EEEDFE;color:#3C3489;font-size:11px;padding:3px 8px;border-radius:20px}
+.controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.btn{padding:7px 14px;border-radius:8px;border:1px solid #ccc;background:#fff;cursor:pointer;font-size:13px;font-weight:500}
+.btn-blue{border-color:#85B7EB;color:#185FA5;background:#E6F1FB}
+.btn-red{border-color:#F09595;color:#A32D2D;background:#FCEBEB}
+.btn-green{border-color:#97C459;color:#3B6D11;background:#EAF3DE}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+.main{display:grid;grid-template-columns:1fr 360px;gap:12px}
+.panel{background:#fff;border:1px solid #e0e0e0;border-radius:10px;overflow:hidden}
+.panel-header{padding:10px 14px;border-bottom:1px solid #e0e0e0;display:flex;justify-content:space-between;align-items:center}
+.panel-title{font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.05em}
+.preview{background:#111;min-height:300px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#666;font-size:13px;gap:8px;position:relative}
+video{display:none;width:100%;height:100%;object-fit:contain;position:absolute;top:0;left:0}
+.events-list{max-height:180px;overflow-y:auto;padding:8px}
+.ev{display:flex;gap:8px;padding:5px 6px;border-radius:6px;font-size:12px;align-items:flex-start}
+.ev:hover{background:#f9f9f9}
+.ev-time{color:#aaa;min-width:40px;font-variant-numeric:tabular-nums}
+.ev-type{padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;min-width:42px;text-align:center}
+.et-click{background:#EEEDFE;color:#3C3489}
+.et-input{background:#EAF3DE;color:#3B6D11}
+.et-focus{background:#FAEEDA;color:#854F0B}
+.et-nav{background:#E6F1FB;color:#185FA5}
+.ev-desc{color:#555;flex:1;line-height:1.4}
+.form-area{padding:14px}
+.form-row{margin-bottom:10px}
+label{font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px}
+input[type=text],textarea{width:100%;padding:7px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px;font-family:Arial,sans-serif}
+input[type=text]:focus,textarea:focus{outline:none;border-color:#85B7EB}
+textarea{resize:vertical;min-height:56px}
+.sev-row{display:flex;gap:6px}
+.sev-btn{flex:1;padding:5px;border:1px solid #ddd;border-radius:6px;background:#fff;cursor:pointer;font-size:11px;font-weight:600;color:#888}
+.sev-btn.sel-critical{background:#FCEBEB;border-color:#F09595;color:#A32D2D}
+.sev-btn.sel-major{background:#FAEEDA;border-color:#FAC775;color:#854F0B}
+.sev-btn.sel-minor{background:#EAF3DE;border-color:#97C459;color:#3B6D11}
+.full-btn{width:100%;padding:8px;border-radius:8px;border:1px solid #85B7EB;background:#E6F1FB;color:#185FA5;font-size:13px;font-weight:600;cursor:pointer;margin-top:4px}
+.findings-wrap{max-height:320px;overflow-y:auto}
+.finding{padding:12px 14px;border-bottom:1px solid #f0f0f0}
+.finding-num{font-size:10px;color:#aaa;font-weight:600;text-transform:uppercase;margin-bottom:2px}
+.finding-issue{font-weight:600;font-size:13px;color:#222;margin-bottom:4px}
+.finding-exp{font-size:12px;color:#666;margin-bottom:6px;line-height:1.5}
+.sev-tag{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600}
+.s-critical{background:#FCEBEB;color:#A32D2D}
+.s-major{background:#FAEEDA;color:#854F0B}
+.s-minor{background:#EAF3DE;color:#3B6D11}
+.empty{text-align:center;color:#bbb;padding:24px;font-size:13px}
+.timer-text{font-size:13px;font-weight:600;color:#E24B4A;display:none}
+.dot{width:8px;height:8px;border-radius:50%;background:#E24B4A;display:inline-block;margin-right:4px;animation:pulse 1s infinite}
+.toast{position:fixed;bottom:20px;right:20px;background:#333;color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;display:none;z-index:999}
+@media(max-width:700px){.main{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">🖥️ QA Findings Recorder <span class="badge">BETA</span></div>
+  <div class="controls">
+    <span class="timer-text" id="timer"><span class="dot"></span><span id="tval">00:00</span></span>
+    <button class="btn btn-blue" id="btn-start" onclick="startRec()">▶ Start Recording</button>
+    <button class="btn btn-red" id="btn-stop" style="display:none" onclick="stopRec()">■ Stop</button>
+    <button class="btn btn-green" id="btn-export" style="display:none" onclick="exportAll()">↓ Export Report</button>
+  </div>
+</div>
+
+<div class="main">
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Screen Preview</span>
+        <span id="rec-status" style="font-size:12px;color:#aaa">Not recording</span>
+      </div>
+      <div class="preview" id="preview">
+        <span style="font-size:32px">🖥️</span>
+        <span>Click Start Recording to capture your screen</span>
+        <span style="font-size:11px;color:#555">Clicks, inputs, and navigation will be tracked</span>
+        <video id="vid" autoplay muted></video>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Captured Events</span>
+        <span id="ev-count" style="font-size:12px;color:#aaa">0 events</span>
+      </div>
+      <div class="events-list" id="ev-list">
+        <div style="text-align:center;color:#bbb;font-size:12px;padding:12px">Events appear here during recording</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">Log a Finding</span></div>
+      <div class="form-area">
+        <div class="form-row">
+          <label>Module / Page</label>
+          <input type="text" id="f-mod" placeholder="e.g. Strategic Performance > Approver">
+        </div>
+        <div class="form-row">
+          <label>Issue</label>
+          <textarea id="f-issue" placeholder="Describe the bug or unexpected behavior..."></textarea>
+        </div>
+        <div class="form-row">
+          <label>Expected behavior</label>
+          <textarea id="f-exp" placeholder="What should happen instead?"></textarea>
+        </div>
+        <div class="form-row">
+          <label>Severity</label>
+          <div class="sev-row">
+            <button class="sev-btn" id="s-critical" onclick="setSev('critical')">Critical</button>
+            <button class="sev-btn sel-major" id="s-major" onclick="setSev('major')">Major</button>
+            <button class="sev-btn" id="s-minor" onclick="setSev('minor')">Minor</button>
+          </div>
+        </div>
+        <button class="full-btn" onclick="logFinding()">+ Log Finding</button>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Findings</span>
+        <span id="f-count" style="font-size:12px;color:#aaa">0 logged</span>
+      </div>
+      <div class="findings-wrap" id="f-list">
+        <div class="empty">No findings yet</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwfavqq7SKueobAFurEKUc8mkP2msX3J0pGu1yDB8Pz1OJyLyRu7xZRlrV_-D50YD3x/exec';
+
+var mr=null,chunks=[],events=[],findings=[],sev='major',t0=null,ti=null,evN=0;
+
+function setSev(s){
+  sev=s;
+  ['critical','major','minor'].forEach(function(x){
+    document.getElementById('s-'+x).className='sev-btn'+(x===s?' sel-'+x:'');
+  });
+}
+function fmt(ms){var s=Math.floor(ms/1000);return pad(Math.floor(s/60))+':'+pad(s%60);}
+function pad(n){return n<10?'0'+n:''+n;}
+function toast(msg){var t=document.getElementById('toast');t.textContent=msg;t.style.display='block';setTimeout(function(){t.style.display='none';},3000);}
+
+function addEv(type,desc){
+  var t=t0?fmt(Date.now()-t0):'00:00';
+  events.push({type:type,desc:desc,t:t});evN++;
+  document.getElementById('ev-count').textContent=evN+' events';
+  var el=document.getElementById('ev-list');
+  if(el.children[0]&&el.children[0].style.textAlign==='center')el.innerHTML='';
+  var d=document.createElement('div');d.className='ev';
+  d.innerHTML='<span class="ev-time">'+t+'</span><span class="ev-type et-'+type+'">'+type+'</span><span class="ev-desc">'+desc+'</span>';
+  el.insertBefore(d,el.firstChild);
+}
+
+var _cl,_in,_fo;
+function attachTrackers(){
+  _cl=function(e){var tg=e.target,tag=tg.tagName.toLowerCase(),txt=(tg.innerText||tg.value||tg.id||tag).slice(0,40);addEv('click',tag+': "'+txt+'"');};
+  _in=function(e){var tg=e.target;addEv('input',(tg.tagName.toLowerCase())+(tg.id?'#'+tg.id:'')+': "'+(tg.value||'').slice(0,30)+'"');};
+  _fo=function(e){var tg=e.target;if(['INPUT','SELECT','TEXTAREA'].indexOf(tg.tagName)>-1)addEv('focus','focused '+(tg.tagName.toLowerCase())+(tg.id?'#'+tg.id:''));};
+  document.addEventListener('click',_cl,true);
+  document.addEventListener('input',_in,true);
+  document.addEventListener('focus',_fo,true);
+}
+function removeTrackers(){
+  document.removeEventListener('click',_cl,true);
+  document.removeEventListener('input',_in,true);
+  document.removeEventListener('focus',_fo,true);
+}
+
+function startRec(){
+  navigator.mediaDevices.getDisplayMedia({video:true,audio:false}).then(function(stream){
+    var vid=document.getElementById('vid');
+    vid.srcObject=stream;vid.style.display='block';
+    mr=new MediaRecorder(stream,{mimeType:'video/webm'});
+    chunks=[];
+    mr.ondataavailable=function(e){if(e.data.size>0)chunks.push(e.data);};
+    mr.start(200);
+    t0=Date.now();
+    ti=setInterval(function(){document.getElementById('tval').textContent=fmt(Date.now()-t0);},1000);
+    document.getElementById('timer').style.display='';
+    document.getElementById('btn-start').style.display='none';
+    document.getElementById('btn-stop').style.display='';
+    document.getElementById('rec-status').textContent='● Recording';
+    document.getElementById('rec-status').style.color='#E24B4A';
+    stream.getVideoTracks()[0].onended=stopRec;
+    attachTrackers();addEv('nav','Recording started');
+  }).catch(function(e){alert('Could not start recording: '+e.message);});
+}
+
+function stopRec(){
+  if(mr&&mr.state!=='inactive')mr.stop();
+  clearInterval(ti);
+  var vid=document.getElementById('vid');
+  if(vid.srcObject)vid.srcObject.getTracks().forEach(function(t){t.stop();});
+  vid.style.display='none';
+  document.getElementById('timer').style.display='none';
+  document.getElementById('btn-stop').style.display='none';
+  document.getElementById('btn-start').style.display='';
+  document.getElementById('btn-export').style.display='';
+  document.getElementById('rec-status').textContent='Stopped · '+evN+' events';
+  document.getElementById('rec-status').style.color='#aaa';
+  removeTrackers();addEv('nav','Recording stopped');
+}
+
+function logFinding(){
+  var mod=document.getElementById('f-mod').value.trim();
+  var issue=document.getElementById('f-issue').value.trim();
+  var exp=document.getElementById('f-exp').value.trim();
+  if(!mod||!issue){alert('Please fill in Module and Issue.');return;}
+  var steps=events.slice(-8).map(function(e,i){return (i+1)+'. ['+e.type+'] '+e.desc+' ('+e.t+')';});
+  var f={id:findings.length+1,module:mod,issue:issue,expected:exp,severity:sev,steps:steps,time:new Date().toLocaleString()};
+  findings.push(f);
+  document.getElementById('f-mod').value='';
+  document.getElementById('f-issue').value='';
+  document.getElementById('f-exp').value='';
+  document.getElementById('f-count').textContent=findings.length+' logged';
+  renderFindings();
+  toast('Finding #'+f.id+' logged!');
+}
+
+function renderFindings(){
+  var el=document.getElementById('f-list');el.innerHTML='';
+  findings.slice().reverse().forEach(function(f){
+    var d=document.createElement('div');d.className='finding';
+    d.innerHTML='<div class="finding-num">Finding #'+f.id+' · '+f.time+'</div>'
+      +'<div style="font-size:11px;color:#aaa;margin-bottom:3px">'+f.module+'</div>'
+      +'<div class="finding-issue">'+f.issue+'</div>'
+      +(f.expected?'<div class="finding-exp"><b>Expected:</b> '+f.expected+'</div>':'')
+      +'<div><span class="sev-tag s-'+f.severity+'">'+f.severity.charAt(0).toUpperCase()+f.severity.slice(1)+'</span>'
+      +(f.steps.length?' <span style="font-size:11px;color:#aaa">'+f.steps.length+' steps</span>':'')+'</div>';
+    el.appendChild(d);
+  });
+}
+
+function buildReport(){
+  var txt='QA FINDINGS REPORT\nGenerated: '+new Date().toLocaleString()+'\n\n';
+  findings.forEach(function(f){
+    txt+='Finding #'+f.id+' — '+f.severity.toUpperCase()+'\n';
+    txt+='Module: '+f.module+'\n';
+    txt+='Issue: '+f.issue+'\n';
+    if(f.expected)txt+='Expected: '+f.expected+'\n';
+    if(f.steps.length)txt+='Steps to Recreate:\n'+f.steps.join('\n')+'\n';
+    txt+='\n---\n\n';
+  });
+  return txt;
+}
+
+function exportAll(){
+  if(findings.length===0){alert('No findings to export yet.');return;}
+  // 1. Download video
+  if(chunks.length>0){
+    var blob=new Blob(chunks,{type:'video/webm'});
+    var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='qa-recording.webm';a.click();
+  }
+  // 2. Download text report
+  var a2=document.createElement('a');
+  a2.href='data:text/plain;charset=utf-8,'+encodeURIComponent(buildReport());
+  a2.download='qa-findings.txt';a2.click();
+  // 3. Send to Google Sheets
+  fetch(APPS_SCRIPT_URL,{
+    method:'POST',
+    body:JSON.stringify({findings:findings})
+  }).then(function(){
+    toast('Saved to Google Sheets!');
+  }).catch(function(){
+    toast('Export done. Sheets sync failed — check your URL.');
+  });
+}
+</script>
+</body>
+</html>
